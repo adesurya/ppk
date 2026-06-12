@@ -1,0 +1,5 @@
+yt-dlp>=2026.6.9
+# viewer (opsional):
+fastapi
+uvicorn
+httpx

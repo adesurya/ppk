@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TikTok Multi-Live Wall</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+  :root { --bg:#0d0d12; --panel:#16161f; --line:#262633; --text:#e8e8ef; --muted:#8a8a9a; --accent:#ff2d55; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:10; }
+  header input { flex:1; min-width:0; padding:9px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:15px; }
+  header button { padding:9px 14px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  #grid { display:grid; gap:8px; padding:8px; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }
+  .tile { position:relative; background:#000; border:1px solid var(--line); border-radius:10px; overflow:hidden; aspect-ratio:9/16; }
+  .tile video { width:100%; height:100%; object-fit:contain; background:#000; }
+  .tile .bar { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:6px 8px; font-size:13px; background:linear-gradient(rgba(0,0,0,.7),transparent); }
+  .tile .name { font-weight:600; }
+  .tile .ctl { display:flex; gap:6px; }
+  .tile .ctl button { width:26px; height:26px; border:none; border-radius:6px; background:rgba(255,255,255,.15); color:#fff; cursor:pointer; font-size:13px; }
+  .tile .status { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:12px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <input id="u" placeholder="username TikTok (tanpa @), Enter untuk tambah" />
+  <button id="add">Tambah</button>
+</header>
+<div id="grid"></div>
+
+<script>
+// Ganti ke origin backend FastAPI kamu kalau beda host/port:
+const API = ""; // contoh: "http://localhost:8800"
+
+const grid = document.getElementById("grid");
+const input = document.getElementById("u");
+const active = new Set();
+
+function addTile(user) {
+  user = user.replace(/^@/, "").trim().toLowerCase();
+  if (!user || active.has(user)) return;
+  active.add(user);
+
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  tile.innerHTML = `
+    <div class="bar">
+      <span class="name">@${user}</span>
+      <span class="ctl">
+        <button title="reload">↻</button>
+        <button title="mute">🔇</button>
+        <button title="hapus">✕</button>
+      </span>
+    </div>
+    <video muted playsinline></video>
+    <div class="status">memuat…</div>`;
+  grid.appendChild(tile);
+
+  const video = tile.querySelector("video");
+  const status = tile.querySelector(".status");
+  const [reloadBtn, muteBtn, closeBtn] = tile.querySelectorAll(".ctl button");
+  let hls = null;
+
+  async function load() {
+    status.textContent = "memuat…";
+    status.style.display = "flex";
+    try {
+      const res = await fetch(`${API}/api/resolve?user=${encodeURIComponent(user)}`);
+      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      const { play_url } = await res.json();
+      const src = API + play_url;
+
+      if (hls) { hls.destroy(); hls = null; }
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = src; // Safari native
+      } else if (window.Hls && Hls.isSupported()) {
+        hls = new Hls({ liveSyncDuration: 4, lowLatencyMode: true });
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) status.textContent = "stream error / putus"; });
+      }
+      video.play().catch(() => {});
+      video.onplaying = () => { status.style.display = "none"; };
+    } catch (e) {
+      status.textContent = "tidak live / gagal: " + e.message;
+    }
+  }
+
+  reloadBtn.onclick = load;
+  muteBtn.onclick = () => { video.muted = !video.muted; muteBtn.textContent = video.muted ? "🔇" : "🔊"; };
+  closeBtn.onclick = () => { if (hls) hls.destroy(); tile.remove(); active.delete(user); };
+
+  load();
+}
+
+document.getElementById("add").onclick = () => { addTile(input.value); input.value = ""; };
+input.addEventListener("keydown", e => { if (e.key === "Enter") { addTile(input.value); input.value = ""; } });
+</script>
+</body>
+</html>

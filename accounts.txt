@@ -1,0 +1,6 @@
+# Daftar akun TikTok yang dipantau (1 username per baris, tanpa @)
+# Baris diawali '#' = komentar, diabaikan.
+
+charlidamelio
+khaby.lame
+# bellapoarch
