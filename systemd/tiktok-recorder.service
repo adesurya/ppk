@@ -1,0 +1,18 @@
+[Unit]
+Description=TikTok Live Recorder (multi-account)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__PYTHON__ __DIR__/recorder.py --file __DIR__/accounts.txt --out __DIR__/recordings
+Restart=always
+RestartSec=10
+# stop rapi: SIGTERM -> recorder mem-finalize file dulu
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

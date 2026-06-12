@@ -1,0 +1,15 @@
+[Unit]
+Description=TikTok Recordings Player (port 6699)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=__PYTHON__ __DIR__/player.py --dir __DIR__/recordings --port 6699
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
