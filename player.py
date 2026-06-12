@@ -65,6 +65,7 @@ PAGE = r"""<!DOCTYPE html>
 </style></head><body>
 <header>
   <h1>🎬 TikTok Recordings</h1><span class="sp"></span>
+  <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="cont" checked> lanjut otomatis</label>
   <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="auto" checked> auto-refresh</label>
   <button onclick="load()">↻ Refresh</button>
 </header>
@@ -73,16 +74,42 @@ PAGE = r"""<!DOCTYPE html>
 <div id="list"><div class="empty">memuat…</div></div>
 <script>
 const listEl=document.getElementById('list'), v=document.getElementById('v'), now=document.getElementById('now');
-let current=null;
+let current=null;          // {url,name,acct,size}
 function fmtSize(b){if(b<1e6)return (b/1e3).toFixed(0)+' KB';if(b<1e9)return (b/1e6).toFixed(1)+' MB';return (b/1e9).toFixed(2)+' GB';}
 function fmtTime(t){const d=new Date(t*1000);return d.toLocaleString();}
-function play(it,el){
-  current=it.url;
+
+function playFile(it,el,acct){
+  current={url:it.url,name:it.name,acct:acct,size:it.size};
   document.querySelectorAll('.row.active').forEach(r=>r.classList.remove('active'));
-  if(el)el.classList.add('active');
+  const row=el||document.querySelector('.row[data-url="'+it.url+'"]');
+  if(row)row.classList.add('active');
   v.src=it.url; v.play().catch(()=>{});
-  now.innerHTML='▶ <b>'+it.name+'</b> &nbsp;·&nbsp; '+fmtSize(it.size)+(it.live?' &nbsp;·&nbsp; <span style="color:var(--live)">● sedang direkam</span>':'');
+  now.innerHTML='▶ <b>'+it.name+'</b> &nbsp;·&nbsp; @'+acct+(it.live?' &nbsp;·&nbsp; <span style="color:var(--live)">● sedang direkam</span>':'');
 }
+
+// dipanggil saat satu bagian habis -> lanjut ke bagian berikutnya / kejar live
+async function continuePlay(){
+  if(!current) return;
+  let data; try{data=await (await fetch('/api/list')).json();}catch(e){return;}
+  const acct=data.accounts.find(a=>a.name===current.acct);
+  if(!acct){now.innerHTML='▶ selesai.';return;}
+  const files=[...acct.files].sort((a,b)=>a.name<b.name?-1:1); // kronologis (nama berisi timestamp)
+  const idx=files.findIndex(f=>f.url===current.url);
+  if(idx>=0 && idx<files.length-1){                 // ada file sesi berikutnya
+    playFile(files[idx+1],null,current.acct); return;
+  }
+  const f=files[idx>=0?idx:files.length-1];          // ini file terbaru
+  if(f && f.live && f.size>current.size){            // masih direkam & sudah bertambah -> muat ulang, lanjut dari posisi terakhir
+    const t=Math.max(0,v.currentTime-1.5); current.size=f.size;
+    v.src=f.url;
+    v.addEventListener('loadedmetadata',function(){try{v.currentTime=t;}catch(_){}v.play().catch(()=>{});},{once:true});
+    return;
+  }
+  if(f && f.live){ now.innerHTML='▶ @'+current.acct+' — menunggu bagian berikutnya…'; setTimeout(continuePlay,3000); return; }
+  now.innerHTML='■ Selesai memutar @'+current.acct+'.';
+}
+v.addEventListener('ended',()=>{ if(document.getElementById('cont').checked) continuePlay(); });
+
 async function load(){
   let data; try{data=await (await fetch('/api/list')).json();}catch(e){listEl.innerHTML='<div class="empty">gagal memuat: '+e+'</div>';return;}
   if(!data.accounts.length){listEl.innerHTML='<div class="empty">Belum ada rekaman di folder.</div>';return;}
@@ -90,18 +117,18 @@ async function load(){
   for(const a of data.accounts){
     h+='<div class="acct">@'+a.name+' <span class="count">'+a.files.length+' file</span></div>';
     for(const f of a.files){
-      h+='<div class="row" data-url="'+f.url+'">'
+      h+='<div class="row" data-url="'+f.url+'" data-acct="'+a.name+'">'
         +'<div class="nm">'+f.name+(f.live?' <span class="badge">LIVE</span>':'')+'</div>'
         +'<div class="meta">'+fmtSize(f.size)+' · '+fmtTime(f.mtime)+'</div>'
         +'<a class="dl" href="'+f.url+'" download title="unduh">⬇</a></div>';
     }
   }
   listEl.innerHTML=h;
+  const byUrl={}; data.accounts.forEach(a=>a.files.forEach(f=>byUrl[f.url]=f));
   document.querySelectorAll('.row').forEach(row=>{
-    const url=row.getAttribute('data-url');
-    const f=data.accounts.flatMap(a=>a.files).find(x=>x.url===url);
-    row.addEventListener('click',e=>{if(e.target.classList.contains('dl'))return;play(f,row);});
-    if(url===current)row.classList.add('active');
+    const url=row.getAttribute('data-url'), acct=row.getAttribute('data-acct');
+    row.addEventListener('click',e=>{if(e.target.classList.contains('dl'))return;playFile(byUrl[url],row,acct);});
+    if(current&&url===current.url)row.classList.add('active');
   });
 }
 load();
