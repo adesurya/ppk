@@ -32,6 +32,8 @@ Opsi:
     --poll  SEC   interval cek live saat akun sedang offline (default: 30)
     --file  PATH  file daftar akun
 """
+from __future__ import annotations
+
 import argparse
 import asyncio
 import shutil

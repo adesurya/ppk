@@ -12,6 +12,8 @@ Jalankan:
 
 Lalu buka:  http://localhost:6699
 """
+from __future__ import annotations
+
 import argparse
 import html
 import json
@@ -20,7 +22,16 @@ import re
 import socket
 import urllib.parse
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
+
+try:
+    from http.server import ThreadingHTTPServer          # Python 3.7+
+except ImportError:                                       # fallback Python 3.6
+    from http.server import HTTPServer
+    from socketserver import ThreadingMixIn
+
+    class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
 
 ROOT = os.path.abspath("recordings")
 VIDEO_EXT = (".mp4", ".ts", ".mkv", ".flv", ".webm")
