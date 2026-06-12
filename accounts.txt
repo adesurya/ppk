@@ -1,6 +1,16 @@
-# Daftar akun TikTok yang dipantau (1 username per baris, tanpa @)
-# Baris diawali '#' = komentar, diabaikan.
-
-charlidamelio
-khaby.lame
-# bellapoarch
+kompascom
+jpradarsemarang
+nurafipratama
+www.sentananews.com
+rubbynoelpoodle
+yupompi
+kadal.bintit24
+jawaposofficial
+subastianhiphoper
+tukangseduhkopi_666
+faaw2e
+beritasatuofficial
+mama_keyyy
+mangmaman204
+priangan.com
+xxxogurlys
